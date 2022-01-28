@@ -46,7 +46,28 @@
 #ifndef APP_H
 #define APP_H
 
+#define EM0 (0)   // Energy Mode 0 - Run Mode
+#define EM1 (1)   // Energy Mode 1 - Sleep Mode
+#define EM2 (2)   // Energy Mode 2 - Deep Sleep Mode
+#define EM3 (3)   // Energy Mode 3 - Stop Mode
 
+#define ENERGY_MODE EM0
+
+#define LETIMER_PERIOD_MS     2250      // Required Time Period = 2.25s
+#define LETIMER_REQ_PERIOD_MS 2075      // Required LED ON Time = 175ms
+
+// Frequency of OSC = 1kHz & prescaler = 1
+#if (ENERGY_MODE == EM3)
+ #define ACTUAL_CLK_FREQ  1000
+#else
+// Frequency of OSC = 32.768kHz & prescaler = 4
+  #define ACTUAL_CLK_FREQ  8192
+#endif
+
+/*From Lec04*/
+#define VALUE_TO_COMP0 (LETIMER_PERIOD_MS*ACTUAL_CLK_FREQ)/1000
+
+#define VALUE_TO_COMP1 (LETIMER_REQ_PERIOD_MS*ACTUAL_CLK_FREQ)/1000
 
 
 

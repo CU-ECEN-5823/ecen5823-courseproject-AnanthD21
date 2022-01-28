@@ -54,6 +54,10 @@
 #include "src/gpio.h"
 #include "src/lcd.h"
 
+#include "em_cmu.h"
+#include "src/oscillator.h"
+#include "src/timers.h"
+
 
 
 // See: https://docs.silabs.com/gecko-platform/latest/service/power_manager/overview
@@ -68,7 +72,11 @@
 //   up the MCU from the call to sl_power_manager_sleep() in the main while (1)
 //   loop.
 // Students: We'll need to modify this for A2 onward.
+#if (ENERGY_MODE == EM0)
 #define APP_IS_OK_TO_SLEEP      (false)
+#else
+#define APP_IS_OK_TO_SLEEP      (true)
+#endif
 //#define APP_IS_OK_TO_SLEEP      (true)
 
 // Return values for app_sleep_on_isr_exit():
@@ -109,7 +117,6 @@
 // Include logging specifically for this .c file
 #define INCLUDE_LOG_DEBUG 1
 #include "src/log.h"
-
 
 
 
@@ -155,10 +162,26 @@ SL_WEAK void app_init(void)
 
   // Student Edit: Add a call to gpioInit() here
   
+  //initialize peripherals
 
+  //initialize gpio
   gpioInit();
 
+  //initialize oscillator
+  oscillatorInit();
 
+  //initialize letimer
+  letimerinit();
+
+  //Power Manager settings for Energy modes EM1 and EM2
+   if (ENERGY_MODE == EM1)
+   {
+      sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM1);
+   }
+   else if(ENERGY_MODE == EM2)
+   {
+      sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM2);
+   }
 }
 
 
@@ -168,7 +191,7 @@ SL_WEAK void app_init(void)
  * comment out this function. Wait loops are a bad idea in general.
  * We'll discuss how to do this a better way in the next assignment.
  *****************************************************************************/
-static void delayApprox(int delay)
+/*static void delayApprox(int delay)
 {
   volatile int i;
 
@@ -176,7 +199,7 @@ static void delayApprox(int delay)
       i=i+1;
   }
 
-} // delayApprox()
+}*/ // delayApprox()
 
 
 
@@ -192,7 +215,7 @@ SL_WEAK void app_process_action(void)
   //         We will create/use a scheme that is far more energy efficient in
   //         later assignments.
 
-  delayApprox(3500000);
+  /*delayApprox(3500000);
 
   gpioLed0SetOn();
   gpioLed1SetOn();
@@ -200,7 +223,7 @@ SL_WEAK void app_process_action(void)
   delayApprox(3500000);
 
   gpioLed0SetOff();
-  gpioLed1SetOff();
+  gpioLed1SetOff();*/
 
 }
 
