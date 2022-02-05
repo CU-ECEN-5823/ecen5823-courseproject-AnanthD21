@@ -26,6 +26,9 @@
 #include "timers.h"
 #include "app.h"
 
+#define INCLUDE_LOG_DEBUG 1
+#include "src/log.h"
+
 /*letimer init structure object*/
 LETIMER_Init_TypeDef letimerInit;
 
@@ -73,6 +76,44 @@ void letimerinit()
 
   //enable LETIMER0
   LETIMER_Enable(LETIMER0, true);
+}
+
+
+/**********************************************************************
+ * wait for provided time value
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+void timerWaitUs(uint32_t waitMicroSeconds)
+{
+
+    uint32_t curCounterVal;
+
+    // Condition to check if the delay time can be handled
+    if(waitMicroSeconds > (LETIMER_PERIOD_MS*1000))
+    {
+       LOG_ERROR("input counter value is beyond the max possible value\n");
+       waitMicroSeconds = 3000000;  // Maximum possible delay
+    }
+
+    uint32_t waitMilliseconds = waitMicroSeconds / 1000;
+    uint32_t delayCount       = (waitMilliseconds * ACTUAL_CLK_FREQ) / 1000;
+
+    curCounterVal = LETIMER_CounterGet(LETIMER0);
+
+    // decrement the count wrt Letimer
+    while (delayCount)
+    {
+       if (curCounterVal != LETIMER_CounterGet(LETIMER0) )
+       {
+          delayCount--;
+          curCounterVal = LETIMER_CounterGet(LETIMER0);
+       }
+    } // while
 }
 
 /**************************end of file**********************************/

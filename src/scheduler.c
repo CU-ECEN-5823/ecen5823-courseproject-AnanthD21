@@ -1,5 +1,5 @@
 /***********************************************************************
-* @file irq.c
+* @file scheduler.c
 * @version 0.0.1
 * @brief Function header file.
 *
@@ -21,18 +21,12 @@
 * use of assignment grading. Use of code excerpts allowed at the
 * discretion of author. Contact for permission.
 */
-
-/*header files*/
-#include "irq.h"
-#include "gpio.h"
-#include "em_core.h"
 #include "scheduler.h"
 
-/*global variables*/
-uint32_t irqState;
+static evt_t event;
 
 /**********************************************************************
- * letimer interrupt handler
+ * scheduler routine to set a scheduler event
  *
  * Parameters:
  *   void
@@ -40,27 +34,50 @@ uint32_t irqState;
  * Returns:
  *   void
  *********************************************************************/
-void LETIMER0_IRQHandler (void)
+void schedulerSetEventTemperatureRead()
 {
-  int flags = 0;
+  CORE_DECLARE_IRQ_STATE;
 
-  //to obtain all current interrupts into a local flag
-  flags = LETIMER_IntGetEnabled(LETIMER0);
+  // enter critical section
+  CORE_ENTER_CRITICAL();
 
-  // clear all the interrupts
-  LETIMER_IntClear(LETIMER0, flags);
+  event = evtLETIMER0_UF;
 
-  if(flags == LETIMER_IEN_UF)
-  {
-      schedulerSetEventTemperatureRead();
-  }
-  /*else if (flags == LETIMER_IEN_COMP1)
-  {
-     // LED is switched OFF at 175ms
-     gpioLed0SetOff();
-  }*/
-  //enable all interrupts
+  // exit critical section
+  CORE_EXIT_CRITICAL();
 
-} // LETIMER0_IRQHandler()
+} // schedulerSetEventXXX()
+
+
+/**********************************************************************
+ * return event
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+uint32_t getNextEvent()
+{
+  uint32_t theEvent;
+
+  CORE_DECLARE_IRQ_STATE;
+
+  // return an event to main
+  theEvent = event;
+
+  // enter critical section
+  CORE_ENTER_CRITICAL();
+
+  // clear the event, this is a read-modify-write
+  // and thus protected via critical section
+  event = clear;
+
+  // exit critical section
+  CORE_EXIT_CRITICAL();
+
+  return (theEvent);
+} // getNextEvent()
 
 /**************************end of file**********************************/

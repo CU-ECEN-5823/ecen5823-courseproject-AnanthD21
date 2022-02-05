@@ -1,17 +1,17 @@
 /***********************************************************************
-* @file timer.h
+* @file i2c.h
 * @version 0.0.1
 * @brief Function header file.
 *
 * @author Ananth Deshpande, ande9392@Colorado.edu
-* @date Jan 28, 2022
+* @date Feb 2, 2022
 *
 * @institution University of Colorado Boulder (UCB)
 * @course ECEN 5823-001: IoT Embedded Firmware (Fall 2020)
 * @instructor David Sluiter
 *
 * @assignment ecen5823-assignment3-AwesomeStudent
-* @due Jan 28, 2022
+* @due Feb 2, 2022
 *
 * @resources Utilized Silicon Labs' EMLIB peripheral libraries to
 * implement functionality.
@@ -22,24 +22,15 @@
 * discretion of author. Contact for permission.
 */
 
-#ifndef SRC_TIMERS_H_
-#define SRC_TIMERS_H_
+#ifndef SRC_I2C_H_
+#define SRC_I2C_H_
 
-#include "em_letimer.h"
+#include "sl_i2cspm.h"
 
-/**********************************************************************
- * initialise letimer
- *
- * Parameters:
- *   void
- *
- * Returns:
- *   void
- *********************************************************************/
-void letimerinit();
+#include "app.h"
+#include "timers.h"
 
-void timerWaitUs();
+void I2Cinit();
+void read_temp_from_si7021();
 
-#endif /* SRC_TIMERS_H_ */
-
-/**************************end of file**********************************/
+#endif /* SRC_I2C_H_ */

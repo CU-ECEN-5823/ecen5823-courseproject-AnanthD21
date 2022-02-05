@@ -4,14 +4,14 @@
 * @brief Function header file.
 *
 * @author Ananth Deshpande, ande9392@Colorado.edu
-* @date Jan 28, 2022
+* @date Feb 2, 2022
 *
 * @institution University of Colorado Boulder (UCB)
 * @course ECEN 5823-001: IoT Embedded Firmware (Fall 2020)
 * @instructor David Sluiter
 *
 * @assignment ecen5823-assignment3-AwesomeStudent
-* @due Jan 28, 2022
+* @due Feb 2, 2022
 *
 * @resources Utilized Silicon Labs' EMLIB peripheral libraries to
 * implement functionality.

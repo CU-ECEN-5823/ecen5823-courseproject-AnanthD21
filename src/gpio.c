@@ -55,8 +55,9 @@ void gpioInit()
 	//GPIO_DriveStrengthSet(LED1_port, gpioDriveStrengthWeakAlternateWeak);
 	//GPIO_PinModeSet(LED1_port, LED1_pin, gpioModePushPull, false);
 
-
-
+  GPIO_DriveStrengthSet(gpioPortD, gpioDriveStrengthStrongAlternateStrong);
+  //GPIO_DriveStrengthSet(LED0_port, gpioDriveStrengthWeakAlternateWeak);
+  GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, false);
 } // gpioInit()
 
 

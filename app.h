@@ -51,9 +51,9 @@
 #define EM2 (2)   // Energy Mode 2 - Deep Sleep Mode
 #define EM3 (3)   // Energy Mode 3 - Stop Mode
 
-#define ENERGY_MODE EM0
+#define ENERGY_MODE EM3
 
-#define LETIMER_PERIOD_MS     2250      // Required Time Period = 2.25s
+#define LETIMER_PERIOD_MS     3000      // Required Time Period = 2.25s
 #define LETIMER_REQ_PERIOD_MS 2075      // Required LED ON Time = 175ms
 
 // Frequency of OSC = 1kHz & prescaler = 1

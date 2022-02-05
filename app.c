@@ -104,8 +104,8 @@
 
 
 #include "app.h"
-
-
+#include "src/i2c.h"
+#include "src/scheduler.h"
 
 // Students: Here is an example of how to correctly include logging functions in
 //           each .c file.
@@ -182,8 +182,10 @@ SL_WEAK void app_init(void)
    {
       sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM2);
    }
-}
 
+   //initialize I2C peripheral
+   I2Cinit();
+}
 
 /*****************************************************************************
  * delayApprox(), private to this file.
@@ -201,9 +203,6 @@ SL_WEAK void app_init(void)
 
 }*/ // delayApprox()
 
-
-
-
 /**************************************************************************//**
  * Application Process Action.
  *****************************************************************************/
@@ -215,16 +214,19 @@ SL_WEAK void app_process_action(void)
   //         We will create/use a scheme that is far more energy efficient in
   //         later assignments.
 
-  /*delayApprox(3500000);
+  uint32_t evt;
 
-  gpioLed0SetOn();
-  gpioLed1SetOn();
+  //to obtain an event from scheduler for processing
+  evt = getNextEvent();
 
-  delayApprox(3500000);
+  switch (evt)
+  {
+    case evtLETIMER0_UF:   read_temp_from_si7021();
+                           break;
 
-  gpioLed0SetOff();
-  gpioLed1SetOff();*/
-
+    default:
+              break;
+  }/// switch
 }
 
 /**************************************************************************//**
