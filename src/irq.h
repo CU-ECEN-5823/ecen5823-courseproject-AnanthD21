@@ -29,6 +29,8 @@
 #include "system_efr32bg13p.h"
 #include "app.h"
 
+int letimerMilliseconds();
+
 #endif /* SRC_IRQ_H_ */
 
 /**************************end of file**********************************/

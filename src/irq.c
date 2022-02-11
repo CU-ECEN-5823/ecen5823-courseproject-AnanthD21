@@ -27,9 +27,12 @@
 #include "gpio.h"
 #include "em_core.h"
 #include "scheduler.h"
+#include "em_i2c.h"
+#include "log.h"
 
 /*global variables*/
 uint32_t irqState;
+static int underflowCount = 0;
 
 /**********************************************************************
  * letimer interrupt handler
@@ -53,14 +56,53 @@ void LETIMER0_IRQHandler (void)
   if(flags == LETIMER_IEN_UF)
   {
       schedulerSetEventTemperatureRead();
+      underflowCount++;
   }
-  /*else if (flags == LETIMER_IEN_COMP1)
+  if (flags == LETIMER_IEN_COMP1)
   {
-     // LED is switched OFF at 175ms
-     gpioLed0SetOff();
-  }*/
-  //enable all interrupts
-
+      schedulerSetEventSetComp1();
+  }
 } // LETIMER0_IRQHandler()
+
+/**********************************************************************
+ * provide milliseconds using Letimer
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+int letimerMilliseconds()
+{
+   int temp = (LETIMER_CounterGet(LETIMER0) * 1000)/ACTUAL_CLK_FREQ;
+
+   return((underflowCount * LETIMER_PERIOD_MS) + temp);
+}
+
+/**********************************************************************
+ * I2C interrupt handler
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+void I2C0_IRQHandler(void)
+{
+   I2C_TransferReturn_TypeDef transferStatus;
+   transferStatus = I2C_Transfer(I2C0);
+
+   if (transferStatus == i2cTransferDone)
+   {
+       schedulerSetI2CEvent();
+   }
+
+   if (transferStatus < 0)
+   {
+      LOG_ERROR("I2C_Transfer failed with %d", transferStatus);
+   }
+} // I2C0_IRQHandler()
 
 /**************************end of file**********************************/

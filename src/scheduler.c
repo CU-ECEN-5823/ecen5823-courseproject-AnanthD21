@@ -26,7 +26,7 @@
 static evt_t event;
 
 /**********************************************************************
- * scheduler routine to set a scheduler event
+ * set underflow event
  *
  * Parameters:
  *   void
@@ -46,8 +46,53 @@ void schedulerSetEventTemperatureRead()
   // exit critical section
   CORE_EXIT_CRITICAL();
 
-} // schedulerSetEventXXX()
+} // schedulerSetEventTemperatureRead()
 
+/**********************************************************************
+ * Set comp1 event
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+void schedulerSetEventSetComp1()
+{
+  CORE_DECLARE_IRQ_STATE;
+
+  // enter critical section
+  CORE_ENTER_CRITICAL();
+
+  event = evtLETIMER0_COMP1;
+
+  // exit critical section
+  CORE_EXIT_CRITICAL();
+
+} // schedulerSetEventComp()
+
+/**********************************************************************
+ * set I2C event
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+void schedulerSetI2CEvent()
+{
+  CORE_DECLARE_IRQ_STATE;
+
+  // enter critical section
+  CORE_ENTER_CRITICAL();
+
+  event = evt_I2C;
+
+  // exit critical section
+  CORE_EXIT_CRITICAL();
+
+} // schedulerSetEventComp()
 
 /**********************************************************************
  * return event

@@ -29,12 +29,28 @@
 #include "app.h"
 
 void schedulerSetEventTemperatureRead();
+
+void schedulerSetEventSetComp1();
+
+void schedulerSetI2CEvent();
+
 uint32_t getNextEvent();
 
 typedef enum
 {
   evtLETIMER0_UF,
+  evtLETIMER0_COMP1,
+  evt_I2C,
   clear
 }evt_t;
+
+typedef enum
+{
+  idle,
+  poweron,
+  waitforwritecompletion,
+  intiateread,
+  readcomplete
+}State_I2C_t;
 
 #endif /* SRC_SCHEDULER_H_ */

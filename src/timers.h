@@ -38,7 +38,9 @@
  *********************************************************************/
 void letimerinit();
 
-void timerWaitUs();
+void timerWaitUs_polled(uint32_t waitMicroSeconds);
+
+void timerWaitUs_irq(uint32_t us_wait);
 
 #endif /* SRC_TIMERS_H_ */
 

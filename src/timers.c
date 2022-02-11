@@ -60,13 +60,13 @@ void letimerinit()
   LETIMER_CompareSet(LETIMER0, 0, VALUE_TO_COMP0);
 
   // Interrupt count updated to COMP1
-  LETIMER_CompareSet(LETIMER0, 1, VALUE_TO_COMP1);
+  //LETIMER_CompareSet(LETIMER0, 1, VALUE_TO_COMP1);
 
   //set letimer counter value
   LETIMER_CounterSet(LETIMER0, VALUE_TO_COMP0);
 
   //Interrupt enabled at Underflow and COMP1
-  LETIMER_IntEnable(LETIMER0, (LETIMER_IEN_UF | LETIMER_IEN_COMP1));
+  LETIMER_IntEnable(LETIMER0, (LETIMER_IEN_UF/* | LETIMER_IEN_COMP1*/));
 
   //clear any pending interrupts
   NVIC_ClearPendingIRQ(LETIMER0_IRQn);
@@ -88,7 +88,7 @@ void letimerinit()
  * Returns:
  *   void
  *********************************************************************/
-void timerWaitUs(uint32_t waitMicroSeconds)
+void timerWaitUs_polled(uint32_t waitMicroSeconds)
 {
 
     uint32_t curCounterVal;
@@ -114,6 +114,54 @@ void timerWaitUs(uint32_t waitMicroSeconds)
           curCounterVal = LETIMER_CounterGet(LETIMER0);
        }
     } // while
+}
+
+/**********************************************************************
+ * wait for provided time value
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+void timerWaitUs_irq(uint32_t waitMicroSeconds)
+{
+   volatile uint32_t temp;
+
+   if((waitMicroSeconds > (LETIMER_PERIOD_MS*1000)))
+   {
+      LOG_ERROR("input counter value is beyond the max possible value\n");
+      waitMicroSeconds = 3000000;
+   }
+   else if(waitMicroSeconds == 0)
+   {
+      LOG_ERROR("input value is zero!!!\r\n");
+   }
+
+   //convert to milliseconds
+   uint32_t waitMilliseconds = waitMicroSeconds / 1000;
+   uint32_t us_wait_count    = (waitMilliseconds * ACTUAL_CLK_FREQ) / 1000;
+
+   uint32_t delayCount       = ((LETIMER_PERIOD_MS * ACTUAL_CLK_FREQ) / 1000);
+
+   if((LETIMER_CounterGet(LETIMER0) - us_wait_count) >= 0)
+   {
+      temp = (LETIMER_CounterGet(LETIMER0) - us_wait_count);
+   }
+   else
+   {
+      temp = (delayCount) -(us_wait_count - LETIMER_CounterGet(LETIMER0));
+   }
+
+   //clear comp1 Interrupt flag
+   LETIMER_IntClear(LETIMER0, LETIMER_IFC_COMP1);
+
+   //load comp1 value
+   LETIMER_CompareSet(LETIMER0, 1, temp);
+
+   //enable comp1 interrupt
+   LETIMER_IntEnable(LETIMER0, LETIMER_IEN_COMP1);
 }
 
 /**************************end of file**********************************/

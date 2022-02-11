@@ -118,6 +118,8 @@
 #define INCLUDE_LOG_DEBUG 1
 #include "src/log.h"
 
+static State_I2C_t currState = idle;
+#define TIME_TO_TRANSFER 11000
 
 
 /*****************************************************************************
@@ -206,6 +208,7 @@ SL_WEAK void app_init(void)
 /**************************************************************************//**
  * Application Process Action.
  *****************************************************************************/
+// scheduler routine to set a scheduler event
 SL_WEAK void app_process_action(void)
 {
   // Put your application code here.
@@ -214,20 +217,101 @@ SL_WEAK void app_process_action(void)
   //         We will create/use a scheme that is far more energy efficient in
   //         later assignments.
 
-  uint32_t evt;
 
-  //to obtain an event from scheduler for processing
-  evt = getNextEvent();
+    uint32_t evt;
+    evt = getNextEvent();
+    // State chart with five states as per the enum State_I2C_t
+    switch(currState)
+    {
+       case idle:
+       {
+          currState = idle;
 
-  switch (evt)
-  {
-    case evtLETIMER0_UF:   read_temp_from_si7021();
-                           break;
+          //enable the sensor
+          if(evt == evtLETIMER0_UF)
+          {
+             enable_si7021();
+             currState = poweron;
+          }
+          break;
+       }
 
-    default:
-              break;
-  }/// switch
-}
+       case poweron:
+       {
+          currState = poweron;
+
+          //For the timerwait_us to expire and interrupt at COMP1
+          if(evt == evtLETIMER0_COMP1)
+          {
+              // Disable the LETIMER0 COMP1
+             LETIMER_IntDisable(LETIMER0, LETIMER_IEN_COMP1);
+             // EM1 Sleepmode at I2C transfer
+             sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM1);
+
+             write_to_si7021();
+
+             currState = waitforwritecompletion;
+          }
+          break;
+       }
+
+       case waitforwritecompletion:
+       {
+          currState = waitforwritecompletion;
+
+          //wait for I2C to complete
+          if(evt == evt_I2C)
+          {
+              // Disable IRQ I2C
+             NVIC_DisableIRQ(I2C0_IRQn);
+
+             sl_power_manager_remove_em_requirement(SL_POWER_MANAGER_EM1);
+
+             timerWaitUs_irq(TIME_TO_TRANSFER);
+
+             currState = intiateread;
+          }
+          break;
+       }
+
+       case intiateread:
+       {
+          currState = intiateread;
+          //wait for comp1 interrupt
+          if(evt == evtLETIMER0_COMP1)
+          {
+              // Disable the LETIMER0 COMP1
+             LETIMER_IntDisable(LETIMER0, LETIMER_IEN_COMP1);
+
+             sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM1);
+
+             read_from_si7021();
+
+             currState = readcomplete;
+          }
+          break;
+       }
+
+       case readcomplete:
+       {
+          currState = readcomplete;
+
+          //provide temperature
+          if(evt == evt_I2C)
+          {
+             NVIC_DisableIRQ(I2C0_IRQn);
+
+             provide_temperature();
+
+             sl_power_manager_remove_em_requirement(SL_POWER_MANAGER_EM1);
+
+             currState = idle;
+          }
+          break;
+       }
+
+    }// switch
+} // app_process_action()
 
 /**************************************************************************//**
  * Bluetooth stack event handler.

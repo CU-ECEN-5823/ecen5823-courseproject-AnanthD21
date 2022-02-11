@@ -29,10 +29,6 @@
 // 80 millisec obtained from datasheet
 #define TIME_TO_WAIT 80000
 
-// 11 millisec transfer time
-#define TIME_TO_TRANSFER 11000
-
-
 #define I2C0_SCL_PORT  gpioPortC
 #define I2C0_SCL_PIN   10
 #define I2C0_SDA_PORT  gpioPortC
@@ -41,48 +37,10 @@
 #define I2C0_PORT_LOC_SDA 16
 #define SI7021_TEMP_SENSOR_ADDR 0x40
 
+
+I2C_TransferSeq_TypeDef transferSequence;
+uint8_t cmd_data;
 uint8_t tempData[2];
-
-/**********************************************************************
- * read temperature value from si7021
- *
- * Parameters:
- *   void
- *
- * Returns:
- *   void
- *********************************************************************/
-int readTemperatureValue()
-{
-  I2C_TransferReturn_TypeDef transferStatus;
-  int tempInDegCelcius = 0;
-  uint16_t dataRead = 0;
-  I2C_TransferSeq_TypeDef readData;
-
-  /*fill the transfer buffer*/
-  readData.addr = SI7021_TEMP_SENSOR_ADDR << 1;
-  readData.flags = I2C_FLAG_READ;
-  readData.buf[0].data = tempData;
-  readData.buf[0].len = sizeof(tempData);
-
-  transferStatus = I2CSPM_Transfer(I2C0,&readData);
-
-  if(i2cTransferDone == transferStatus)
-  {
-     dataRead = (tempData[0] << 8)+ tempData[1];
-
-     tempInDegCelcius = (((dataRead * 175.72)/65536)-46.85);
-
-     LOG_INFO("temperature read from si7021 is %d deg celcius\n\r",tempInDegCelcius);
-
-     return tempInDegCelcius;
-  }
-  else
-  {
-      LOG_ERROR("I2CSPM_Transfer failed with status %d",transferStatus);
-     return 0;
-  }
-}
 
 /**********************************************************************
  * enable or disable sensor
@@ -106,7 +64,7 @@ void enableSensor(bool status)
 }
 
 /**********************************************************************
- * read temperature from si7021 sensor
+ * enable the si7021 temperature sensor
  *
  * Parameters:
  *   void
@@ -114,40 +72,101 @@ void enableSensor(bool status)
  * Returns:
  *   void
  *********************************************************************/
-void read_temp_from_si7021()
+int enable_si7021()
 {
-  I2C_TransferReturn_TypeDef transferStatus;
-  I2C_TransferSeq_TypeDef writeData;
+   // Enable the sensor
+   enableSensor(true);
 
-  // Enable the sensor
-  enableSensor(true);
+   // wait for I2C transfer
+   timerWaitUs_irq(TIME_TO_WAIT);
 
-  //wait for 80ms to get sensor up
-  timerWaitUs(TIME_TO_WAIT);
+   return 0;
+}
 
-  uint8_t cmd_data = 0xF3;
-  writeData.addr         = (SI7021_TEMP_SENSOR_ADDR << 1);
-  writeData.flags        = I2C_FLAG_WRITE;
-  writeData.buf[0].data  = &cmd_data;
-  writeData.buf[0].len   = sizeof(cmd_data);
+/**********************************************************************
+ * to write to si7021 via I2C
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+void write_to_si7021(void)
+{
+   I2C_TransferReturn_TypeDef transferStatus;
 
-  // I2CSPM_Transfer returns the transfer state
-  transferStatus = I2CSPM_Transfer(I2C0, &writeData);
+   /*initialise i2c*/
+   I2Cinit();
 
-  // on successful I2CSPM_Transfer
-  if(i2cTransferDone == transferStatus)
-  {
-     /*wait for transfer to complete*/
-     timerWaitUs(TIME_TO_TRANSFER);
-     readTemperatureValue();
-  }
-  else
-  {
-     LOG_ERROR("I2CSPM_Transfer failed with status %d",transferStatus);
-  }
+   cmd_data = 0xF3;
 
-  //disable the sensor
-  enableSensor(false);
+   transferSequence.addr        = (SI7021_TEMP_SENSOR_ADDR << 1);
+   transferSequence.flags       = I2C_FLAG_WRITE;
+   transferSequence.buf[0].data = &cmd_data;
+   transferSequence.buf[0].len  = sizeof(cmd_data);
+
+   NVIC_EnableIRQ(I2C0_IRQn);
+
+   transferStatus = I2C_TransferInit(I2C0, &transferSequence);
+
+   if (transferStatus < 0)
+   {
+      LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
+   }
+}
+
+/**********************************************************************
+ * read temperature value from si7021
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+void read_from_si7021()
+{
+   I2C_TransferReturn_TypeDef transferStatus;
+
+   /*initialise i2c*/
+   I2Cinit();
+
+   transferSequence.addr = (SI7021_TEMP_SENSOR_ADDR << 1);
+   transferSequence.flags = I2C_FLAG_READ;
+   transferSequence.buf[0].data = &tempData[0];
+   transferSequence.buf[0].len = sizeof(tempData);
+
+   NVIC_EnableIRQ(I2C0_IRQn);
+
+   transferStatus = I2C_TransferInit (I2C0, &transferSequence);
+
+   if (transferStatus < 0)
+   {
+      LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
+   }
+}
+
+/**********************************************************************
+ * provides temperature value from si7021
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+void provide_temperature()
+{
+   uint16_t tempInDegCelcius = 0;
+
+   uint16_t dataRead = (tempData[0] << 8) + tempData[1];
+
+   tempInDegCelcius = (((dataRead * 175.72) / 65536) - 46.85);
+
+   LOG_INFO("temperature is %d\n\r",tempInDegCelcius);
+
+   enableSensor(false);
 }
 
 /**********************************************************************

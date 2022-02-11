@@ -31,6 +31,15 @@
 #include "timers.h"
 
 void I2Cinit();
-void read_temp_from_si7021();
+
+void read_from_si7021();
+
+int write_temp_from_si7021();
+
+int enable_si7021();
+
+void write_to_si7021 (void);
+
+void provide_temperature();
 
 #endif /* SRC_I2C_H_ */
