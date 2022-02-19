@@ -21,12 +21,18 @@
 * use of assignment grading. Use of code excerpts allowed at the
 * discretion of author. Contact for permission.
 */
-#include "scheduler.h"
 
-static evt_t event;
+/*header files*/
+#include "scheduler.h"
+#include "log.h"
+#include "i2c.h"
+#define INCLUDE_LOG_DEBUG 1
+
+static State_I2C_t currState = idle;
+#define TIME_TO_TRANSFER 11000
 
 /**********************************************************************
- * set underflow event
+ * temperature state machine
  *
  * Parameters:
  *   void
@@ -34,22 +40,101 @@ static evt_t event;
  * Returns:
  *   void
  *********************************************************************/
-void schedulerSetEventTemperatureRead()
+void state_machine(sl_bt_msg_t *evt)
 {
-  CORE_DECLARE_IRQ_STATE;
+    switch(currState)
+    {
+       case idle:
+       {
+          currState = idle;
 
-  // enter critical section
-  CORE_ENTER_CRITICAL();
+          if(evt->data.evt_system_external_signal.extsignals == evtLETIMER0_UF)
+          {
+             currState = poweron;
+             enable_si7021();
+          }
 
-  event = evtLETIMER0_UF;
+          break;
+       }
 
-  // exit critical section
-  CORE_EXIT_CRITICAL();
+      case poweron:
+      {
+         currState = poweron;
 
-} // schedulerSetEventTemperatureRead()
+         if(evt->data.evt_system_external_signal.extsignals == evtLETIMER0_COMP1)
+         {
+            currState = waitforwritecompletion;
+
+            sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM1);
+            write_to_si7021();
+         }
+
+         break;
+      }
+
+      case waitforwritecompletion:
+      {
+         currState = waitforwritecompletion;
+
+         if(evt->data.evt_system_external_signal.extsignals == evt_I2C)
+         {
+            currState = intiateread;
+            NVIC_DisableIRQ(I2C0_IRQn);
+            sl_power_manager_remove_em_requirement(SL_POWER_MANAGER_EM1);
+
+            timerWaitUs_irq(TIME_TO_TRANSFER);
+         }
+
+         break;
+      }
+
+      case intiateread:
+      {
+         currState = intiateread;
+
+         if(evt->data.evt_system_external_signal.extsignals == evtLETIMER0_COMP1)
+         {
+            currState = readcomplete;
+            sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM1);
+            read_from_si7021();
+         }
+
+         break;
+      }
+
+      case readcomplete:
+      {
+         currState = readcomplete;
+
+         if(evt->data.evt_system_external_signal.extsignals == evt_I2C)
+         {
+            NVIC_DisableIRQ(I2C0_IRQn);
+            currState = idle;
+            sl_power_manager_remove_em_requirement(SL_POWER_MANAGER_EM1);
+            provide_temperature();
+         }
+         break;
+      }
+  }
+}
 
 /**********************************************************************
- * Set comp1 event
+ * set the underflow event
+ *
+ * Parameters:
+ *   void
+ *
+ * Returns:
+ *   void
+ *********************************************************************/
+
+void  schedulerSetEventTemperatureRead()
+{
+   CORE_CRITICAL_SECTION(sl_bt_external_signal(evtLETIMER0_UF););
+}
+
+/**********************************************************************
+ * set the comp1 event
  *
  * Parameters:
  *   void
@@ -59,20 +144,11 @@ void schedulerSetEventTemperatureRead()
  *********************************************************************/
 void schedulerSetEventSetComp1()
 {
-  CORE_DECLARE_IRQ_STATE;
-
-  // enter critical section
-  CORE_ENTER_CRITICAL();
-
-  event = evtLETIMER0_COMP1;
-
-  // exit critical section
-  CORE_EXIT_CRITICAL();
-
-} // schedulerSetEventComp()
+   CORE_CRITICAL_SECTION(sl_bt_external_signal(evtLETIMER0_COMP1););
+}
 
 /**********************************************************************
- * set I2C event
+ * set the i2c event
  *
  * Parameters:
  *   void
@@ -82,47 +158,7 @@ void schedulerSetEventSetComp1()
  *********************************************************************/
 void schedulerSetI2CEvent()
 {
-  CORE_DECLARE_IRQ_STATE;
+   CORE_CRITICAL_SECTION(sl_bt_external_signal(evt_I2C););
+}
 
-  // enter critical section
-  CORE_ENTER_CRITICAL();
-
-  event = evt_I2C;
-
-  // exit critical section
-  CORE_EXIT_CRITICAL();
-
-} // schedulerSetEventComp()
-
-/**********************************************************************
- * return event
- *
- * Parameters:
- *   void
- *
- * Returns:
- *   void
- *********************************************************************/
-uint32_t getNextEvent()
-{
-  uint32_t theEvent;
-
-  CORE_DECLARE_IRQ_STATE;
-
-  // return an event to main
-  theEvent = event;
-
-  // enter critical section
-  CORE_ENTER_CRITICAL();
-
-  // clear the event, this is a read-modify-write
-  // and thus protected via critical section
-  event = clear;
-
-  // exit critical section
-  CORE_EXIT_CRITICAL();
-
-  return (theEvent);
-} // getNextEvent()
-
-/**************************end of file**********************************/
+/*********************end of file**************************/

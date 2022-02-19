@@ -1,5 +1,5 @@
 /***********************************************************************
-* @file oscillator.c
+* @file oscillator.h
 * @version 0.0.1
 * @brief Function header file.
 *

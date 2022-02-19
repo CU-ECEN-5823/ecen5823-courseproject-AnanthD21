@@ -22,6 +22,7 @@
 * discretion of author. Contact for permission.
 */
 #include "i2c.h"
+#include "ble.h"
 
 #define INCLUDE_LOG_DEBUG 1
 #include "src/log.h"
@@ -112,7 +113,7 @@ void write_to_si7021(void)
 
    if (transferStatus < 0)
    {
-      LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
+      //LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
    }
 }
 
@@ -134,7 +135,7 @@ void read_from_si7021()
 
    transferSequence.addr = (SI7021_TEMP_SENSOR_ADDR << 1);
    transferSequence.flags = I2C_FLAG_READ;
-   transferSequence.buf[0].data = &tempData[0];
+   transferSequence.buf[0].data = tempData;
    transferSequence.buf[0].len = sizeof(tempData);
 
    NVIC_EnableIRQ(I2C0_IRQn);
@@ -143,7 +144,7 @@ void read_from_si7021()
 
    if (transferStatus < 0)
    {
-      LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
+      //LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
    }
 }
 
@@ -158,15 +159,17 @@ void read_from_si7021()
  *********************************************************************/
 void provide_temperature()
 {
-   uint16_t tempInDegCelcius = 0;
+   float tempInDegCelcius = 0;
 
    uint16_t dataRead = (tempData[0] << 8) + tempData[1];
 
    tempInDegCelcius = (((dataRead * 175.72) / 65536) - 46.85);
 
-   LOG_INFO("temperature is %d\n\r",tempInDegCelcius);
+   //LOG_INFO("temperature is %d\n\r",tempInDegCelcius);
 
    enableSensor(false);
+
+   report_data_ble(tempInDegCelcius);
 }
 
 /**********************************************************************

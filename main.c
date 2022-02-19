@@ -39,35 +39,14 @@
  *
  ******************************************************************************/
  
-
-// *************************************************
-// Students: Do not modify this file!
-// *************************************************
-
-
-//#include "main.h"
-#ifndef MAIN_H
-#define MAIN_H
-
-#include "sl_component_catalog.h"
-#include "sl_system_init.h"
-
-#include "app.h"
-
-#if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
-#include "sl_power_manager.h"
-#endif // SL_CATALOG_POWER_MANAGER_PRESENT
-#if defined(SL_CATALOG_KERNEL_PRESENT)
-#include "sl_system_kernel.h"
-#else // SL_CATALOG_KERNEL_PRESENT
-#include "sl_system_process_action.h"
-#endif // SL_CATALOG_KERNEL_PRESENT
+ #include "main.h"
+ 
+// Include logging for this file
+#define INCLUDE_LOG_DEBUG 1
+#include "src/log.h"
 
 
 
-
-
-#endif
 
 
 int main(void)
@@ -75,6 +54,7 @@ int main(void)
   // Initialize Silicon Labs device, system, service(s) and protocol stack(s).
   // Note that if the kernel is present, processing task(s) will be created by
   // this call.
+  //sl_bt_msg_t evt;
   sl_system_init();
 
   // Initialize the application. For example, create periodic timer(s) or
@@ -82,6 +62,7 @@ int main(void)
   // Students: Place all of your 1 time initialization code in this function.
   //           See app.c
   app_init();
+  //logInit();
 
 #if defined(SL_CATALOG_KERNEL_PRESENT)
 
@@ -103,6 +84,7 @@ int main(void)
     // Application process. See app.c
     app_process_action();
 
+    //sl_bt_on_event(evt);
 #if defined(SL_CATALOG_POWER_MANAGER_PRESENT)
     // Let the CPU go to sleep if the system allows it.
     sl_power_manager_sleep();

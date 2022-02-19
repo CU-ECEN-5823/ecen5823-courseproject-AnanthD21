@@ -1,5 +1,5 @@
 /***********************************************************************
-* @file irq.c
+* @file irq.h
 * @version 0.0.1
 * @brief Function header file.
 *

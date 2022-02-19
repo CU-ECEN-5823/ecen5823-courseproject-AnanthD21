@@ -79,10 +79,10 @@ struct display_data {
   uint32_t                 dmdInitConfig; // DMD_InitConfig type is defined as void?
 
   // tracks the state of the extcomin pin for toggling purposes
-	bool                     last_extcomin_state_high;
+  bool                     last_extcomin_state_high;
 
-	// GLIB_Context required for use with GLIB_ functions
-	GLIB_Context_t           glibContext;
+  // GLIB_Context required for use with GLIB_ functions
+  GLIB_Context_t           glibContext;
 
 };
 
@@ -97,7 +97,7 @@ static struct display_data     global_display_data;
 
 // private function to return pointer to the display data
 static struct display_data         *displayGetData() {
-	return &global_display_data;
+  return &global_display_data;
 }
 
 
@@ -294,24 +294,24 @@ void displayInit()
     }
 
 
-	  // The BT stack implements timers that we can setup and then have the stack pass back
-	  // events when the timer expires.
-	  // This assignment has us using the Sharp LCD which needs to be serviced approx
-	  // every 1 second, in order to toggle the input "EXTCOMIN" input to the LCD display.
-	  // The documentation is a bit sketchy, but apparently charge can build up within
-	  // the LCD and it needs to be bled off. So toggling the EXTCOMIN input is the method by
-	  // which this takes place.
-	  // We will get a sl_bt_evt_system_soft_timer_id event as a result of calling
-	  // sl_bt_system_set_soft_timer() i.e. starting the timer.
+    // The BT stack implements timers that we can setup and then have the stack pass back
+    // events when the timer expires.
+    // This assignment has us using the Sharp LCD which needs to be serviced approx
+    // every 1 second, in order to toggle the input "EXTCOMIN" input to the LCD display.
+    // The documentation is a bit sketchy, but apparently charge can build up within
+    // the LCD and it needs to be bled off. So toggling the EXTCOMIN input is the method by
+    // which this takes place.
+    // We will get a sl_bt_evt_system_soft_timer_id event as a result of calling
+    // sl_bt_system_set_soft_timer() i.e. starting the timer.
 
     // Edit #3
     // Students: Figure out what parameters to pass in to sl_bt_system_set_soft_timer() to
     //           set up a 1 second repeating soft timer and uncomment the following lines
 
-	  //sl_status_t          timer_response;
-	  //timer_response = sl_bt_system_set_soft_timer();
-	  //if (timer_response != SL_STATUS_OK) {
-	  //    LOG_...
+    //sl_status_t          timer_response;
+    //timer_response = sl_bt_system_set_soft_timer();
+    //if (timer_response != SL_STATUS_OK) {
+    //    LOG_...
     // }
 
 
@@ -328,20 +328,16 @@ void displayInit()
  */
 void displayUpdate()
 {
-	struct display_data *display = displayGetData();
+  struct display_data *display = displayGetData();
 
-	// toggle the var that remembers the state of EXTCOMIN pin
-	display->last_extcomin_state_high = !display->last_extcomin_state_high;
+  // toggle the var that remembers the state of EXTCOMIN pin
+  display->last_extcomin_state_high = !display->last_extcomin_state_high;
 
-	// Edit #2
+  // Edit #2
   // Students: Create the function gpioSetDisplayExtcomin() that will set
-	//           the EXTCOMIN input to the LCD. Add that function to gpio.c./.h
-	//           Then uncomment the following line.
-	//
-	//gpioSetDisplayExtcomin(display->last_extcomin_state_high);
-	
+  //           the EXTCOMIN input to the LCD. Add that function to gpio.c./.h
+  //           Then uncomment the following line.
+  //
+  //gpioSetDisplayExtcomin(display->last_extcomin_state_high);
+
 } // displayUpdate()
-
-
-
-

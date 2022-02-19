@@ -22,26 +22,30 @@
 * discretion of author. Contact for permission.
 */
 
-#ifndef SRC_SCHEDULER_H_
-#define SRC_SCHEDULER_H_
+
+#ifndef SCHEDULER_H
+#define SCHEDULER_H
 
 #include "em_core.h"
 #include "app.h"
+#include "ble.h"
 
-void schedulerSetEventTemperatureRead();
+void scheduler_init();
 
+void  schedulerSetEventTemperatureRead();
 void schedulerSetEventSetComp1();
-
 void schedulerSetI2CEvent();
-
 uint32_t getNextEvent();
+void state_machine(sl_bt_msg_t *evt);
+
+
 
 typedef enum
 {
-  evtLETIMER0_UF,
+  clear = 0,
+  evtLETIMER0_UF = 1,
   evtLETIMER0_COMP1,
-  evt_I2C,
-  clear
+  evt_I2C
 }evt_t;
 
 typedef enum
@@ -53,4 +57,5 @@ typedef enum
   readcomplete
 }State_I2C_t;
 
-#endif /* SRC_SCHEDULER_H_ */
+
+#endif
