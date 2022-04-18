@@ -36,7 +36,8 @@
 
 
 void handle_ble_event(sl_bt_msg_t *evt);
-void report_data_ble(float temp_c);
+void report_data_ble_humidity(uint16_t temp_c);
+void report_data_ble(int temp_c);
 
 #define UINT8_TO_BITSTREAM(p, n) { *(p)++ = (uint8_t)(n); }
 #define UINT32_TO_BITSTREAM(p, n) { *(p)++ = (uint8_t)(n); *(p)++ = (uint8_t)((n) >> 8); \
@@ -50,7 +51,12 @@ typedef struct
    uint8_t myAddressType;
    // values unique for server
    uint8_t advertisingSetHandle;
-   bool i_am_a_bool;
+   bool connection_status;
+   bool indication_flag;
+   uint8_t connectionHandle;
+   uint8_t openedConnection;
+   uint8_t client_config_flag;
+   uint8_t status_flags;
    // values unique for client
 } ble_data_struct_t;
 

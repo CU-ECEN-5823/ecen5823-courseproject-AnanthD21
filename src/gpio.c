@@ -32,7 +32,11 @@
 #define LED1_port  gpioPortF //since LED1 is at portF, wkt port F is numbered 5
 #define LED1_pin   5         //since LED1 is at PF5
 
+#define SNSR_EN_port gpioPortD // Sensor Enable port set to PortD
+#define SNSR_EN_pin 15         // Sensor Enable pin set to 15
 
+#define EXT_COM_IN_port gpioPortD // EXT COM INPUT Enable port set to PortD
+#define EXT_COM_IN_pin 13         // EXT COM INPUT Enabke pin set to 13
 
 
 
@@ -55,9 +59,13 @@ void gpioInit()
   //GPIO_DriveStrengthSet(LED1_port, gpioDriveStrengthWeakAlternateWeak);
   //GPIO_PinModeSet(LED1_port, LED1_pin, gpioModePushPull, false);
 
-  GPIO_DriveStrengthSet(gpioPortD, gpioDriveStrengthStrongAlternateStrong);
+  GPIO_DriveStrengthSet(SNSR_EN_port, gpioDriveStrengthStrongAlternateStrong);
   //GPIO_DriveStrengthSet(LED0_port, gpioDriveStrengthWeakAlternateWeak);
-  GPIO_PinModeSet(gpioPortD, 15, gpioModePushPull, false);
+  GPIO_PinModeSet(SNSR_EN_port, SNSR_EN_pin, gpioModePushPull, false);
+
+  GPIO_DriveStrengthSet(EXT_COM_IN_port, gpioDriveStrengthStrongAlternateStrong);
+  //GPIO_DriveStrengthSet(LED0_port, gpioDriveStrengthWeakAlternateWeak);
+  GPIO_PinModeSet(EXT_COM_IN_port, EXT_COM_IN_pin, gpioModePushPull, false);
 } // gpioInit()
 
 
@@ -84,7 +92,35 @@ void gpioLed1SetOff()
   GPIO_PinOutClear(LED1_port,LED1_pin);
 }
 
+void gpioSensorEnSetOn(){
+  GPIO_PinOutSet(SNSR_EN_port, SNSR_EN_pin);
+}
 
+/* GPIO function ON for External Communication Input ON */
+void gpioextcominOn(){
+  GPIO_PinOutSet(EXT_COM_IN_port, EXT_COM_IN_pin);
+
+}
+
+/* GPIO function OFF for External Communication Input ON */
+void gpioextcominOff(){
+  GPIO_PinOutClear(EXT_COM_IN_port, EXT_COM_IN_pin);
+
+}
+
+/*Connection for GPIO Set Display for External Communication Input*/
+void gpioSetDisplayExtcomin(bool value){
+
+  if(value == 1){
+      gpioextcominOn();
+  }
+  else if(value == 0){
+      gpioextcominOff();
+  }
+  else{
+      //No Action
+  }
+}
 
 
 

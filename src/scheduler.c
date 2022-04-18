@@ -26,13 +26,24 @@
 #include "scheduler.h"
 #include "log.h"
 #include "i2c.h"
+#include "src/i2c_sgp40.h"
+#include <src/i2c_shtc3.h>
+
 #define INCLUDE_LOG_DEBUG 1
+#include "src/log.h"
 
 static State_I2C_t currState = idle;
-#define TIME_TO_TRANSFER 11000
+
+#define TIME_TO_WAIT_SGP40 1000
+#define TIME_TO_COMPUTE_SGP40 250000
+#define TIME_TO_WAIT_SHTC3 300
+#define TIME_TO_COMPUTE_SHTC3 13000
+
+//bool flag to alternate between sgp40 and shtc3 sensors reading alternatively
+bool switchSensor = false;
 
 /**********************************************************************
- * temperature state machine
+ * state Machine for reading sensors alternatively
  *
  * Parameters:
  *   void
@@ -40,7 +51,7 @@ static State_I2C_t currState = idle;
  * Returns:
  *   void
  *********************************************************************/
-void state_machine(sl_bt_msg_t *evt)
+void sensorsStateMachine(sl_bt_msg_t *evt)
 {
     switch(currState)
     {
@@ -50,23 +61,41 @@ void state_machine(sl_bt_msg_t *evt)
 
           if(evt->data.evt_system_external_signal.extsignals == evtLETIMER0_UF)
           {
-             currState = poweron;
-             enable_si7021();
+              if(true == switchSensor)
+              {
+                 timerWaitUs_irq(TIME_TO_WAIT_SGP40);
+              }
+              else
+              {
+                  timerWaitUs_irq(TIME_TO_WAIT_SHTC3);
+              }
+              currState = initiatewrite;
           }
 
           break;
        }
 
-      case poweron:
+      case initiatewrite:
       {
-         currState = poweron;
+         currState = initiatewrite;
 
          if(evt->data.evt_system_external_signal.extsignals == evtLETIMER0_COMP1)
          {
-            currState = waitforwritecompletion;
-
+             // Disable the LETIMER0 COMP1
+            LETIMER_IntDisable(LETIMER0, LETIMER_IEN_COMP1);
+            // EM1 Sleepmode at I2C transfer
             sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM1);
-            write_to_si7021();
+
+            if(true == switchSensor)
+            {
+               write_to_sgp40();
+            }
+            else
+            {
+                write_to_shtc3();
+            }
+
+            currState = waitforwritecompletion;
          }
 
          break;
@@ -78,11 +107,21 @@ void state_machine(sl_bt_msg_t *evt)
 
          if(evt->data.evt_system_external_signal.extsignals == evt_I2C)
          {
-            currState = intiateread;
+             // Disable IRQ I2C
             NVIC_DisableIRQ(I2C0_IRQn);
+
             sl_power_manager_remove_em_requirement(SL_POWER_MANAGER_EM1);
 
-            timerWaitUs_irq(TIME_TO_TRANSFER);
+            if(true == switchSensor)
+            {
+               timerWaitUs_irq(TIME_TO_COMPUTE_SGP40);
+            }
+            else
+            {
+                timerWaitUs_irq(TIME_TO_COMPUTE_SHTC3);
+            }
+
+            currState = intiateread;
          }
 
          break;
@@ -94,9 +133,21 @@ void state_machine(sl_bt_msg_t *evt)
 
          if(evt->data.evt_system_external_signal.extsignals == evtLETIMER0_COMP1)
          {
-            currState = readcomplete;
+             // Disable the LETIMER0 COMP1
+            LETIMER_IntDisable(LETIMER0, LETIMER_IEN_COMP1);
+
             sl_power_manager_add_em_requirement(SL_POWER_MANAGER_EM1);
-            read_from_si7021();
+
+            if(true == switchSensor)
+            {
+                read_from_sgp40();
+            }
+            else
+            {
+                read_from_shtc3();
+            }
+
+            currState = readcomplete;
          }
 
          break;
@@ -108,10 +159,25 @@ void state_machine(sl_bt_msg_t *evt)
 
          if(evt->data.evt_system_external_signal.extsignals == evt_I2C)
          {
-            NVIC_DisableIRQ(I2C0_IRQn);
-            currState = idle;
-            sl_power_manager_remove_em_requirement(SL_POWER_MANAGER_EM1);
-            provide_temperature();
+             NVIC_DisableIRQ(I2C0_IRQn);
+
+             if(true == switchSensor)
+             {
+                 int retVal = obtainVOCRawValues();
+                 report_data_ble(retVal);
+             }
+             else
+             {
+                 int retVal = obtainHumidityValues();
+                 report_data_ble_humidity(retVal);
+             }
+
+             sl_power_manager_remove_em_requirement(SL_POWER_MANAGER_EM1);
+
+             currState = idle;
+
+             /*toggle the flag in order to read each sensor data alternatively*/
+             switchSensor = !switchSensor;
          }
          break;
       }

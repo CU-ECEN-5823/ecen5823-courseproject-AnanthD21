@@ -21,15 +21,11 @@
 * use of assignment grading. Use of code excerpts allowed at the
 * discretion of author. Contact for permission.
 */
-#if 0
-#include "i2c.h"
-#include "ble.h"
-#include "gpio.h"
+#include <src/i2c_sgp40.h>
+#include "scheduler.h"
+
 #define INCLUDE_LOG_DEBUG 1
 #include "src/log.h"
-
-// 80 millisec obtained from datasheet
-#define TIME_TO_WAIT 80000
 
 #define I2C0_SCL_PORT  gpioPortC
 #define I2C0_SCL_PIN   10
@@ -37,15 +33,15 @@
 #define I2C0_SDA_PIN   11
 #define I2C0_PORT_LOC_SCL 14
 #define I2C0_PORT_LOC_SDA 16
-#define SI7021_TEMP_SENSOR_ADDR 0x40
+#define SGP40_SENSOR_ADDR 0x59
 
+//sequence of bytes to be sent to sgp40 to initiate a read
+uint8_t sgp_write[8] = {0x26, 0x0F, 0x80, 0x00, 0xA2, 0x66, 0x66, 0x93};
 
-I2C_TransferSeq_TypeDef transferSequence;
-uint8_t cmd_data;
-uint8_t tempData[2];
-
+static I2C_TransferSeq_TypeDef transferSequence;
+uint8_t tempData[3];
 /**********************************************************************
- * enable or disable sensor
+ * to write to sgp40 via I2C
  *
  * Parameters:
  *   void
@@ -53,60 +49,17 @@ uint8_t tempData[2];
  * Returns:
  *   void
  *********************************************************************/
-void enableSensor(bool status)
-{
-   if(status == true)
-   {
-      GPIO_PinOutSet(gpioPortD, 15);
-   }
-   else
-   {
-      GPIO_PinOutClear(gpioPortD, 15);
-   }
-}
-
-/**********************************************************************
- * enable the si7021 temperature sensor
- *
- * Parameters:
- *   void
- *
- * Returns:
- *   void
- *********************************************************************/
-int enable_si7021()
-{
-   // Enable the sensor
-   //enableSensor(true);
-   gpioSensorEnSetOn();
-   // wait for I2C transfer
-   timerWaitUs_irq(TIME_TO_WAIT);
-
-   return 0;
-}
-
-/**********************************************************************
- * to write to si7021 via I2C
- *
- * Parameters:
- *   void
- *
- * Returns:
- *   void
- *********************************************************************/
-void write_to_si7021(void)
+void write_to_sgp40(void)
 {
    I2C_TransferReturn_TypeDef transferStatus;
 
    /*initialise i2c*/
    I2Cinit();
 
-   cmd_data = 0xF3;
-
-   transferSequence.addr        = (SI7021_TEMP_SENSOR_ADDR << 1);
+   transferSequence.addr        = (SGP40_SENSOR_ADDR << 1);
    transferSequence.flags       = I2C_FLAG_WRITE;
-   transferSequence.buf[0].data = &cmd_data;
-   transferSequence.buf[0].len  = sizeof(cmd_data);
+   transferSequence.buf[0].data = &sgp_write[0];
+   transferSequence.buf[0].len  = sizeof(sgp_write);
 
    NVIC_EnableIRQ(I2C0_IRQn);
 
@@ -114,12 +67,12 @@ void write_to_si7021(void)
 
    if (transferStatus < 0)
    {
-      //LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
+      LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
    }
 }
 
 /**********************************************************************
- * read temperature value from si7021
+ * read VOC value from sgp40
  *
  * Parameters:
  *   void
@@ -127,16 +80,16 @@ void write_to_si7021(void)
  * Returns:
  *   void
  *********************************************************************/
-void read_from_si7021()
+void read_from_sgp40()
 {
    I2C_TransferReturn_TypeDef transferStatus;
 
    /*initialise i2c*/
    I2Cinit();
 
-   transferSequence.addr = (SI7021_TEMP_SENSOR_ADDR << 1);
+   transferSequence.addr = (SGP40_SENSOR_ADDR << 1);
    transferSequence.flags = I2C_FLAG_READ;
-   transferSequence.buf[0].data = tempData;
+   transferSequence.buf[0].data = &tempData[0];
    transferSequence.buf[0].len = sizeof(tempData);
 
    NVIC_EnableIRQ(I2C0_IRQn);
@@ -145,12 +98,12 @@ void read_from_si7021()
 
    if (transferStatus < 0)
    {
-      //LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
+      LOG_ERROR("I2C_TransferInit() failed = %d", transferStatus);
    }
 }
 
 /**********************************************************************
- * provides temperature value from si7021
+ * to read VOC values
  *
  * Parameters:
  *   void
@@ -158,19 +111,13 @@ void read_from_si7021()
  * Returns:
  *   void
  *********************************************************************/
-void provide_temperature()
+int obtainVOCRawValues()
 {
-   float tempInDegCelcius = 0;
-
    uint16_t dataRead = (tempData[0] << 8) + tempData[1];
 
-   tempInDegCelcius = (((dataRead * 175.72) / 65536) - 46.85);
+   LOG_INFO("raw VOC value is %d\n\r",dataRead);
 
-   //LOG_INFO("temperature is %d\n\r",tempInDegCelcius);
-
-   //enableSensor(false);
-
-   report_data_ble(tempInDegCelcius);
+   return dataRead;
 }
 
 /**********************************************************************
@@ -204,4 +151,3 @@ void I2Cinit()
 }
 
 /**************************end of file**********************************/
-#endif

@@ -1,5 +1,5 @@
 /***********************************************************************
-* @file scheduler.h
+* @file i2c.h
 * @version 0.0.1
 * @brief Function header file.
 *
@@ -15,47 +15,28 @@
 *
 * @resources Utilized Silicon Labs' EMLIB peripheral libraries to
 * implement functionality.
-* -
+*
 *
 * @copyright All rights reserved. Distribution allowed only for the
 * use of assignment grading. Use of code excerpts allowed at the
 * discretion of author. Contact for permission.
 */
 
+#ifndef SRC_I2C_SGP40_H_
+#define SRC_I2C_SGP40_H_
 
-#ifndef SCHEDULER_H
-#define SCHEDULER_H
+#include "sl_i2cspm.h"
 
-#include "em_core.h"
 #include "app.h"
-#include "ble.h"
+#include "timers.h"
 
-void scheduler_init();
+void I2Cinit();
 
-void  schedulerSetEventTemperatureRead();
-void schedulerSetEventSetComp1();
-void schedulerSetI2CEvent();
-uint32_t getNextEvent();
-void sensorsStateMachine(sl_bt_msg_t *evt);
+void write_to_sgp40(void);
 
+void read_from_sgp40();
 
-
-typedef enum
-{
-  clear = 0,
-  evtLETIMER0_UF = 1,
-  evtLETIMER0_COMP1,
-  evt_I2C
-}evt_t;
-
-typedef enum
-{
-  idle,
-  initiatewrite,
-  waitforwritecompletion,
-  intiateread,
-  readcomplete
-}State_I2C_t;
+int obtainVOCRawValues();
 
 
-#endif
+#endif /* SRC_I2C_SGP40_H_ */

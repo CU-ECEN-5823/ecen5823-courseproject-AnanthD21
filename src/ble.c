@@ -24,19 +24,21 @@
 
 /*header files*/
 #include "ble.h"
-
+#include "lcd.h"
 #define INCLUDE_LOG_DEBUG 1
 #include "src/log.h"
 
 // The advertising set handle allocated from Bluetooth stack.
-static uint8_t advertising_set_handle = 0xff;
-bool connect_status = false;
+//static uint8_t advertising_set_handle = 0xff;
+/*bool connect_status = false;
 
 static uint8_t client_config_flag = 0;
 static uint8_t status_flags = 0;
-static uint8_t openedConnection = 0;
+static uint8_t openedConnection = 0;*/
 
-static bool isTempAvail = 0;
+static bool isVOCAvail = 0;
+static bool isHumidityAvail = 0;
+static bool in_flight = false;
 
 // BLE private data
 ble_data_struct_t ble_data;
@@ -67,9 +69,11 @@ ble_data_struct_t* provideBleDataPtr()
 void handle_ble_event(sl_bt_msg_t *evt)
 {
    sl_status_t sc;
-   bd_addr address;
-   uint8_t address_type;
+   //bd_addr address;
+   //uint8_t address_type;
    uint8_t sys_id[8];
+
+   ble_data_struct_t* data = provideBleDataPtr();
 
    // Handle stack events
    switch (SL_BT_MSG_ID(evt->header))
@@ -81,19 +85,30 @@ void handle_ble_event(sl_bt_msg_t *evt)
       // system_boot Event
       case sl_bt_evt_system_boot_id:
 
+        displayInit();
         // obtain unique ID from bluetooth Address.
-        sc = sl_bt_system_get_identity_address(&address, &address_type);
+        sc = sl_bt_system_get_identity_address(&data->myAddress, &data->myAddressType);
         app_assert_status(sc);
 
+        displayPrintf(DISPLAY_ROW_NAME, "Server");
+        displayPrintf(DISPLAY_ROW_BTADDR, "%02X:%02X:%02X:%02X:%02X:%02X",
+                                           data->myAddress.addr[5],
+                                           data->myAddress.addr[4],
+                                           data->myAddress.addr[3],
+                                           data->myAddress.addr[2],
+                                           data->myAddress.addr[1],
+                                           data->myAddress.addr[0]);
+        displayPrintf(DISPLAY_ROW_ASSIGNMENT, "A6");
+
         //reverse unique ID to get System ID.
-        sys_id[0] = address.addr[5];
-        sys_id[1] = address.addr[4];
-        sys_id[2] = address.addr[3];
+        sys_id[0] = data->myAddress.addr[5];
+        sys_id[1] = data->myAddress.addr[4];
+        sys_id[2] = data->myAddress.addr[3];
         sys_id[3] = 0xFF;
         sys_id[4] = 0xFE;
-        sys_id[5] = address.addr[2];
-        sys_id[6] = address.addr[1];
-        sys_id[7] = address.addr[0];
+        sys_id[5] = data->myAddress.addr[2];
+        sys_id[6] = data->myAddress.addr[1];
+        sys_id[7] = data->myAddress.addr[0];
 
         sc = sl_bt_gatt_server_write_attribute_value(gattdb_system_id,
                                                      0,
@@ -102,12 +117,12 @@ void handle_ble_event(sl_bt_msg_t *evt)
         app_assert_status(sc);
 
         // Create advertising set.
-        sc = sl_bt_advertiser_create_set(&advertising_set_handle);
+        sc = sl_bt_advertiser_create_set(&data->advertisingSetHandle);
         app_assert_status(sc);
 
         // Set advertising interval to 250ms as mentioned in A5 documents
         sc = sl_bt_advertiser_set_timing(
-                                         advertising_set_handle, // advertising set handle
+                                         data->advertisingSetHandle, // advertising set handle
                                          400, // minimum advertising interval (milliseconds * 1.6)
                                          400, // maximum advertising interval (milliseconds * 1.6)
                                            0, // advertising duration
@@ -116,21 +131,24 @@ void handle_ble_event(sl_bt_msg_t *evt)
 
         // Start general advertising and enable connections.
         sc = sl_bt_advertiser_start(
-                                    advertising_set_handle,
+                                    data->advertisingSetHandle,
                                     sl_bt_advertiser_general_discoverable,
                                     sl_bt_advertiser_connectable_scannable);
         app_assert_status(sc);
 
         LOG_INFO("advertising Started\n");
+
+        displayPrintf(DISPLAY_ROW_CONNECTION, "Adverstising");
         break;
 
       // This event indicates that a new connection was opened.
       case sl_bt_evt_connection_opened_id:
 
         LOG_INFO("Connection has been opened\n");
-        connect_status = true;
+        displayPrintf(DISPLAY_ROW_CONNECTION, "Connected");
+        data->connection_status = true;
 
-        sc = sl_bt_advertiser_stop(advertising_set_handle);
+        sc = sl_bt_advertiser_stop(data->advertisingSetHandle);
 
         app_assert_status(sc);
 
@@ -146,21 +164,23 @@ void handle_ble_event(sl_bt_msg_t *evt)
       // Connection Closed event
       case sl_bt_evt_connection_closed_id:
 
+        displayPrintf(DISPLAY_ROW_TEMPVALUE,"");
         LOG_INFO("Connection has closed\n");
-        connect_status = false;
+        data->connection_status = false;
 
         /* Clear the flag bits */
-        client_config_flag = 0;
-        status_flags = 0;
+        data->client_config_flag = 0;
+        data->status_flags = 0;
 
         // start advertising
         sc = sl_bt_advertiser_start(
-                                    advertising_set_handle,
+                                    data->advertisingSetHandle,
                                     sl_bt_advertiser_general_discoverable,
                                     sl_bt_advertiser_connectable_scannable);
 
         app_assert_status(sc);
         LOG_INFO("Started advertising\n");
+        displayPrintf(DISPLAY_ROW_CONNECTION, "Advertising");
         break;
 
       // Connection Parameters event
@@ -183,18 +203,38 @@ void handle_ble_event(sl_bt_msg_t *evt)
          * or that a confirmation from the remote GATT client was received
          * upon a successful reception of the indication
          */
-        client_config_flag = evt->data.evt_gatt_server_characteristic_status.client_config_flags;
-        status_flags       = evt->data.evt_gatt_server_characteristic_status.status_flags;
-        openedConnection   = evt->data.evt_gatt_server_characteristic_status.connection;
+        data->client_config_flag = evt->data.evt_gatt_server_characteristic_status.client_config_flags;
+        data->status_flags       = evt->data.evt_gatt_server_characteristic_status.status_flags;
+        data->openedConnection   = evt->data.evt_gatt_server_characteristic_status.connection;
 
-        if ((client_config_flag == 2) && (openedConnection != 0))
+        if(evt->data.evt_gatt_server_characteristic_status.characteristic == gattdb_VOC_index)
         {
-            isTempAvail = 1;
+           if ((data->client_config_flag == sl_bt_gatt_indication) &&
+               (data->openedConnection != sl_bt_gatt_disable))
+           {
+               isVOCAvail = 1;
+           }
+           else
+           {
+               isVOCAvail = 0;
+           }
         }
-        else
+        else if(evt->data.evt_gatt_server_characteristic_status.characteristic == gattdb_Relative_Humidity)
         {
-            isTempAvail = 0;
+            if ((data->client_config_flag == sl_bt_gatt_indication) &&
+                (data->openedConnection != sl_bt_gatt_disable))
+            {
+                isHumidityAvail = 1;
+            }
+            else
+            {
+                isHumidityAvail = 0;
+            }
         }
+        break;
+
+      case sl_bt_evt_system_soft_timer_id:
+        displayUpdate();
         break;
 
       // Default event handler.
@@ -205,25 +245,16 @@ void handle_ble_event(sl_bt_msg_t *evt)
     }
 }
 
-/**********************************************************************
- * report_data_ble provides temperature value
- *
- * Parameters:
- *   void
- *
- * Returns:
- *   void
- *********************************************************************/
-void report_data_ble(float temp_c)
+void report_data_ble(int temp_c)
 {
    sl_status_t sc;
 
-   if(isTempAvail == 1)
+   if((isVOCAvail == 1))
    {
-      LOG_INFO("inside isTempAvail\n\r");
+      LOG_INFO("inside new report data ble\n\r");
 
       /*Temperature transfer using Gatt server write attribute*/
-      uint8_t htm_temperature_buffer[5];
+      /*uint8_t htm_temperature_buffer[5];
       uint8_t *p = htm_temperature_buffer;
       uint32_t htm_temperature_flt;
       uint8_t flags = 0x00;
@@ -232,21 +263,74 @@ void report_data_ble(float temp_c)
       htm_temperature_flt = UINT32_TO_FLOAT(temp_c*1000, -3);
 
       // Convert temperature to bitstream and place it in the htm_temperature_buffer
-      UINT32_TO_BITSTREAM(p, htm_temperature_flt);
-      sc = sl_bt_gatt_server_write_attribute_value (gattdb_temperature_measurement, // Attribute from gatt_db.h
+      UINT32_TO_BITSTREAM(p, htm_temperature_flt);*/
+      sc = sl_bt_gatt_server_write_attribute_value (gattdb_VOC_index, // Attribute from gatt_db.h
                                                     0,                              // Offset set to 0
-                                                    5,                              // Size of the data transmitted = array length of 5.
-                                                    htm_temperature_buffer);        // Passing the address of the value
+                                                    4,                              // Size of the data transmitted = array length of 5.
+                                                    &temp_c);        // Passing the address of the value
       app_assert_status(sc);
 
-      sc = sl_bt_gatt_server_send_indication(openedConnection,                  // characteristic
-                                             gattdb_temperature_measurement,    // Attribute from gatt_db.h
-                                             5,                                 // value_len
-                                             htm_temperature_buffer);           // value to be sent
+      sc = sl_bt_gatt_server_send_indication(ble_data.openedConnection,                  // characteristic
+                                             gattdb_VOC_index,    // Attribute from gatt_db.h
+                                             4,                                 // value_len
+                                             &temp_c);           // value to be sent
 
-      printf("opened connection : %d\t client_config_flag = %d\t status_flags = %d",
-              openedConnection, client_config_flag, status_flags);
+      printf("VOC: opened connection : %d\t client_config_flag = %d\t status_flags = %d\n",
+             ble_data.openedConnection, ble_data.client_config_flag, ble_data.status_flags);
       app_assert_status(sc);
+      displayPrintf(DISPLAY_ROW_TEMPVALUE, "VOC = %d", (int)temp_c);
+
+      isVOCAvail = 0;
+      in_flight = true;
+   }
+   else
+   {
+      displayPrintf(DISPLAY_ROW_TEMPVALUE, "");
+   }
+}
+
+void report_data_ble_humidity(uint16_t temp_c)
+{
+   sl_status_t sc;
+
+   if((isHumidityAvail == 1))
+   {
+      LOG_INFO("inside new report data ble\n\r");
+
+      /*Temperature transfer using Gatt server write attribute*/
+      /*uint8_t htm_temperature_buffer[5];
+      uint8_t *p = htm_temperature_buffer;
+      uint32_t htm_temperature_flt;
+      uint8_t flags = 0x00;
+
+      UINT8_TO_BITSTREAM(p, flags);
+      htm_temperature_flt = UINT32_TO_FLOAT(temp_c*1000, -3);
+
+      // Convert temperature to bitstream and place it in the htm_temperature_buffer
+      UINT32_TO_BITSTREAM(p, htm_temperature_flt);*/
+      //temp_c = 1;
+      sc = sl_bt_gatt_server_write_attribute_value (gattdb_Relative_Humidity, // Attribute from gatt_db.h
+                                                    0,                              // Offset set to 0
+                                                    2,                              // Size of the data transmitted = array length of 5.
+                                                    &temp_c);        // Passing the address of the value
+      app_assert_status(sc);
+
+      sc = sl_bt_gatt_server_send_indication(ble_data.openedConnection,                  // characteristic
+                                             gattdb_Relative_Humidity,    // Attribute from gatt_db.h
+                                             2,                                 // value_len
+                                             &temp_c);           // value to be sent
+
+      printf("VOC: opened connection : %d\t client_config_flag = %d\t status_flags = %d\n",
+             ble_data.openedConnection, ble_data.client_config_flag, ble_data.status_flags);
+      app_assert_status(sc);
+      displayPrintf(DISPLAY_ROW_TEMPVALUE, "humidity = %d", (int)temp_c);
+
+      isHumidityAvail = 0;
+      in_flight = true;
+   }
+   else
+   {
+      displayPrintf(DISPLAY_ROW_TEMPVALUE, "");
    }
 }
 
