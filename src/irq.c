@@ -55,7 +55,7 @@ void LETIMER0_IRQHandler (void)
 
   if(flags == LETIMER_IEN_UF)
   {
-      schedulerSetEventTemperatureRead();
+      schedulerSetEventSensorRead();
       underflowCount++;
   }
   if (flags == LETIMER_IEN_COMP1)

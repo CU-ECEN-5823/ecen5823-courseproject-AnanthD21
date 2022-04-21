@@ -38,7 +38,8 @@
 #include "math.h"
 
 void handle_ble_event(sl_bt_msg_t *evt);
-void report_data_ble(float temp_c);
+void report_data_ble_sgp40_values(int );
+void report_data_ble_shtc3_values(int );
 
 #define UINT8_TO_BITSTREAM(p, n) { *(p)++ = (uint8_t)(n); }
 #define UINT32_TO_BITSTREAM(p, n) { *(p)++ = (uint8_t)(n); *(p)++ = (uint8_t)((n) >> 8); \
@@ -73,6 +74,15 @@ typedef struct
 
   uint32_t thermometer_service_handle;
   uint16_t thermometer_characteristic_handle;
+
+  uint32_t voc_service_handle;
+  uint16_t voc_characteristic_handle;
+
+  uint32_t hum_service_handle;
+  uint16_t hum_characteristic_handle;
+
+  bool inflight_indication;
+
   Client_Evt ble_client_evt;
   uint8_t procedure_completed;
 } ble_data_struct_t;

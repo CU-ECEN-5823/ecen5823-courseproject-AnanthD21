@@ -32,11 +32,11 @@
 
 void scheduler_init();
 
-void  schedulerSetEventTemperatureRead();
+void  schedulerSetEventSensorRead();
 void schedulerSetEventSetComp1();
 void schedulerSetI2CEvent();
 uint32_t getNextEvent();
-void state_machine(sl_bt_msg_t *evt);
+void sensorsStateMachine(sl_bt_msg_t *evt);
 
 
 
@@ -51,7 +51,7 @@ typedef enum
 typedef enum
 {
   idle,
-  poweron,
+  initiatewrite,
   waitforwritecompletion,
   intiateread,
   readcomplete
@@ -62,6 +62,9 @@ typedef enum
    ConnectionState,
    ServiceState,
    CharacteristicState,
+   humConnectionState,
+   humServiceState,
+   humCharacteristicState,
    IndicationState
 }State_Disovery_t;
 

@@ -235,7 +235,7 @@ void sl_bt_on_event(sl_bt_msg_t *evt)
 
 #if DEVICE_IS_BLE_SERVER
 // SERVER
-  state_machine(evt);
+  sensorsStateMachine(evt);
 #else
 //CLIENT
   discovery_state_machine(evt);

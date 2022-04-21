@@ -4,6 +4,7 @@
 * @brief Function header file.
 *
 * @author Ananth Deshpande, ande9392@Colorado.edu
+*          Abhishek suryawanshi, absu8154@colorado.edu
 * @date Feb 2, 2022
 *
 * @institution University of Colorado Boulder (UCB)
@@ -25,7 +26,7 @@
 /*header files*/
 #include "ble.h"
 
-#define INCLUDE_LOG_DEBUG 0
+#define INCLUDE_LOG_DEBUG 1
 #include "src/log.h"
 
 #include "ble_device_type.h"
@@ -33,14 +34,20 @@
 // BLE private data
 ble_data_struct_t ble_data; // this is the declaration
 
+static bool isVocIndicationSet = false;
+static bool isHumIndicationSet = false;
+
 #if DEVICE_IS_BLE_SERVER
 // The advertising set handle allocated from Bluetooth stack.
 static uint8_t advertising_set_handle = 0xff;
 #else
-// Health Thermometer service UUID
-static const uint8_t thermo_service[2] = { 0x09, 0x18 };
-// Temperature Measurement characteristic UUID
-static const uint8_t thermo_char[2] = { 0x1c, 0x2a };
+//Humidity service UUID
+static const uint8_t hum_service[16] = {0x52, 0x87, 0xE6, 0x69,0x6E, 0x23, 0xd3, 0xb2, 0x47, 0x40, 0x6d, 0x5c, 0x42, 0xec, 0x5d, 0xb0};
+static const uint8_t hum_char[16] = {0x17, 0x1E, 0x67, 0xE4, 0x39, 0xCE, 0xB4, 0x9C, 0xAE, 0x4D, 0x63, 0x35, 0x96, 0x8B, 0x14, 0xE4};
+
+//VOC service UUID
+static const uint8_t voc_service[16] = {0xd7, 0x38, 0xd9, 0xfe, 0x19, 0x95, 0x08, 0xA2, 0x47, 0x4E, 0xD9, 0x30, 0x3C, 0xF0, 0xD0, 0xCE};
+static const uint8_t voc_char[16] = {0x02, 0xEB, 0x12, 0xE4, 0x4E, 0xE9, 0x37, 0x93, 0xC4, 0x42, 0x85, 0x52, 0x14, 0xCA, 0xD1, 0x6D};
 #endif
 
 /**********************************************************************
@@ -74,7 +81,8 @@ void handle_ble_event(sl_bt_msg_t *evt)
 #if DEVICE_IS_BLE_SERVER
     //uint8_t system_id[8];
 #else
-    uint8_t * temperature;
+    uint8_t * voc;
+    uint8_t * hum;
     int i=0;
     int flag_addr = 0;
 #endif
@@ -292,6 +300,7 @@ void handle_ble_event(sl_bt_msg_t *evt)
         /* Clear the flag bits */
         ble_data.client_config_flag = 0;
         ble_data.status_flags = 0;
+        ble_data.inflight_indication = false;
 
         // Begin Advertising
         sc = sl_bt_advertiser_start(
@@ -339,6 +348,31 @@ void handle_ble_event(sl_bt_msg_t *evt)
               ble_data.status_flags = evt->data.evt_gatt_server_characteristic_status.status_flags;
           }
 
+          if(evt->data.evt_gatt_server_characteristic_status.characteristic == gattdb_VOC_index)
+          {
+              LOG_ERROR("inside VOC char\n");
+              if(/*evt->data.evt_gatt_server_characteristic_status.status_flags == sl_bt_gatt_server_confirmation &&*/
+                  (sl_bt_gatt_client_config_flag_t)evt->data.evt_gatt_server_characteristic_status.client_config_flags == sl_bt_gatt_indication)
+                {
+                  LOG_ERROR("Recieved VOC indication\n");
+                  isVocIndicationSet = true;
+                  ble_data.inflight_indication = false;
+                }
+          }
+
+          if(evt->data.evt_gatt_server_characteristic_status.characteristic == gattdb_Relative_Humidity)
+          {
+              LOG_ERROR("inside hum char\n");
+              if(/*evt->data.evt_gatt_server_characteristic_status.status_flags == sl_bt_gatt_server_confirmation &&*/
+                  (sl_bt_gatt_client_config_flag_t)evt->data.evt_gatt_server_characteristic_status.client_config_flags == sl_bt_gatt_indication)
+                {
+                  LOG_ERROR("Recieved Humidity indication\n");
+                  isHumIndicationSet = true;
+                  ble_data.inflight_indication = false;
+                }
+
+          }
+
 
         break;
 
@@ -352,11 +386,14 @@ void handle_ble_event(sl_bt_msg_t *evt)
        case sl_bt_evt_gatt_service_id:
        {
           // saving service handle for implementation in state chart
-          if(evt->data.evt_gatt_service.uuid.data[0] == thermo_service[0] && evt->data.evt_gatt_service.uuid.data[1] == thermo_service[1])
+          if(memcmp(evt->data.evt_gatt_service.uuid.data, &voc_service, 16) == 0)
           {
-             ble_data.thermometer_service_handle = evt->data.evt_gatt_service.service;
+              ble_data.voc_service_handle = evt->data.evt_gatt_service.service;
+          }
 
-             LOG_INFO("ProcedureComplete : sending to state Client_EvtService\r\n");
+          if(memcmp(evt->data.evt_gatt_service.uuid.data, &hum_service, 16) == 0)
+          {
+              ble_data.hum_service_handle = evt->data.evt_gatt_service.service;
           }
 
           break;
@@ -367,11 +404,16 @@ void handle_ble_event(sl_bt_msg_t *evt)
 
        {
           // saving characteristic handle for implementation in state chart
-          if(evt->data.evt_gatt_characteristic.uuid.data[0] == thermo_char[0] && evt->data.evt_gatt_characteristic.uuid.data[1] == thermo_char[1])
+          if(memcmp(evt->data.evt_gatt_characteristic.uuid.data, &voc_char, 16) == 0)
           {
-             ble_data.thermometer_characteristic_handle = evt->data.evt_gatt_characteristic.characteristic;
-             LOG_INFO("ProcedureComplete : sending to state Client_EvtCharacteristic\n");
+             ble_data.voc_characteristic_handle = evt->data.evt_gatt_characteristic.characteristic;
           }
+
+          if(memcmp(evt->data.evt_gatt_characteristic.uuid.data, &hum_char, 16) == 0)
+          {
+             ble_data.hum_characteristic_handle = evt->data.evt_gatt_characteristic.characteristic;
+          }
+
           break;
        }
 
@@ -388,16 +430,45 @@ void handle_ble_event(sl_bt_msg_t *evt)
 
        case sl_bt_evt_gatt_characteristic_value_id:
        {
+
           if((evt->data.evt_gatt_characteristic_value.att_opcode == sl_bt_gatt_handle_value_indication) &&
-             (evt->data.evt_gatt_characteristic_value.characteristic == ble_data.thermometer_characteristic_handle))
+             (evt->data.evt_gatt_characteristic_value.characteristic == ble_data.voc_characteristic_handle))
           {
              ble_data.ble_client_evt = Client_Indicate_Event;
 
-             temperature = &(evt->data.evt_gatt_characteristic_value.value.data[0]);
-             int temp = FLOAT_TO_INT32(temperature);
-             LOG_INFO("int_temp = %ld", temp);
+             sc = sl_bt_gatt_send_characteristic_confirmation(evt->data.evt_gatt_characteristic_value.connection);
+
+             //app_assert_status(sc);
+             if(sc != SL_STATUS_OK)
+             {
+                LOG_ERROR("sl_bt_gatt_send_characteristic_confirmation failed %d\n", sc);
+             }
+
+             voc = &(evt->data.evt_gatt_characteristic_value.value.data[0]);
+             int voc_temp = FLOAT_TO_INT32(voc);
+             LOG_INFO("VOC = %ld", voc_temp);
              displayPrintf(DISPLAY_ROW_CONNECTION, "Handling Indications");
-             displayPrintf(DISPLAY_ROW_TEMPVALUE, "Temp=%d", temp);
+             displayPrintf(DISPLAY_ROW_TEMPVALUE, "VOC = %d", voc_temp);
+          }
+
+          if((evt->data.evt_gatt_characteristic_value.att_opcode == sl_bt_gatt_handle_value_indication) &&
+             (evt->data.evt_gatt_characteristic_value.characteristic == ble_data.hum_characteristic_handle))
+          {
+             ble_data.ble_client_evt = Client_Indicate_Event;
+
+             sc = sl_bt_gatt_send_characteristic_confirmation(evt->data.evt_gatt_characteristic_value.connection);
+
+             //app_assert_status(sc);
+             if(sc != SL_STATUS_OK)
+             {
+                LOG_ERROR("sl_bt_gatt_send_characteristic_confirmation failed\n");
+             }
+
+             hum = &(evt->data.evt_gatt_characteristic_value.value.data[0]);
+             int hum_temp = FLOAT_TO_INT32(hum);
+             LOG_INFO("humidity = %ld", hum_temp);
+             displayPrintf(DISPLAY_ROW_CONNECTION, "Handling Indications");
+             displayPrintf(DISPLAY_ROW_8, "humidity = %d", hum_temp);
           }
 
           break;
@@ -411,6 +482,60 @@ void handle_ble_event(sl_bt_msg_t *evt)
     }
 }
 
+void report_data_ble_shtc3_values(int humidity)
+{
+   sl_status_t sc;
+
+   if ((ble_data.openedConnection != 0) && (ble_data.client_config_flag == 2) && (ble_data.status_flags != 0)
+        && (ble_data.inflight_indication == false) && (isHumIndicationSet == true))
+   {
+
+      uint8_t hum_buffer[5];
+      uint8_t *p = hum_buffer;
+      uint32_t hum_flt;
+      uint8_t flags = 0x00;
+
+      UINT8_TO_BITSTREAM(p, flags);
+      hum_flt = UINT32_TO_FLOAT(humidity *1000, -3);
+
+      // Convert temperature to bitstream and place it in the htm_temperature_buffer
+      UINT32_TO_BITSTREAM(p, hum_flt);
+
+      sc = sl_bt_gatt_server_write_attribute_value(gattdb_Relative_Humidity, // Attribute from gatt_db.h
+                                                     0,                             // Offset set to 0
+                                                     5,                             // Size of the data transmitted = array length of 5.
+                                                     hum_buffer);       // Passing the address of the value
+
+      if(sc != SL_STATUS_OK)
+      {
+         LOG_ERROR("sl_bt_gatt_server_write_attribute_value failed\n");
+      }
+
+      sc = sl_bt_gatt_server_send_indication(ble_data.openedConnection,                  // characteristic
+                                             gattdb_Relative_Humidity,            // Attribute from gatt_db.h
+                                                5,                                  // value_len
+                                                hum_buffer);            // value to be sent
+
+      ble_data.inflight_indication = true;
+
+      if(sc != SL_STATUS_OK)
+      {
+         LOG_ERROR("sl_bt_gatt_server_send_indication failed %d\n", sc);
+         ble_data.inflight_indication = false;
+      }
+
+      displayPrintf(DISPLAY_ROW_8, "humidity = %d", humidity);
+   }
+   else
+   {
+#if DEVICE_IS_BLE_SERVER
+      displayPrintf(DISPLAY_ROW_TEMPVALUE, "");
+#else
+
+#endif
+   }
+}
+
 /**********************************************************************
  * report_data_ble provides temperature value
  *
@@ -420,31 +545,29 @@ void handle_ble_event(sl_bt_msg_t *evt)
  * Returns:
  *   void
  *********************************************************************/
-void report_data_ble(float temp_c)
+void report_data_ble_sgp40_values(int voc)
 {
    sl_status_t sc;
-   int temp;
 
-   if ((ble_data.openedConnection != 0) && (ble_data.client_config_flag == 2) && (ble_data.status_flags != 0))
+   if ((ble_data.openedConnection != 0) && (ble_data.client_config_flag == 2) && (ble_data.status_flags != 0)
+       && (ble_data.inflight_indication == false) && (isVocIndicationSet == true))
    {
-      temp = (int)temp_c;
 
-      uint8_t htm_temperature_buffer[5];
-      uint8_t *p = htm_temperature_buffer;
-      uint32_t htm_temperature_flt;
+      uint8_t voc_buffer[5];
+      uint8_t *p = voc_buffer;
+      uint32_t voc_flt;
       uint8_t flags = 0x00;
 
       UINT8_TO_BITSTREAM(p, flags);
-      htm_temperature_flt = UINT32_TO_FLOAT(temp_c*1000, -3);
+      voc_flt = UINT32_TO_FLOAT(voc, 0);
 
       // Convert temperature to bitstream and place it in the htm_temperature_buffer
-      UINT32_TO_BITSTREAM(p, htm_temperature_flt);
+      UINT32_TO_BITSTREAM(p, voc_flt);
 
-      sc = sl_bt_gatt_server_write_attribute_value(gattdb_temperature_measurement, // Attribute from gatt_db.h
+      sc = sl_bt_gatt_server_write_attribute_value(gattdb_VOC_index, // Attribute from gatt_db.h
                                                      0,                             // Offset set to 0
                                                      5,                             // Size of the data transmitted = array length of 5.
-                                                     htm_temperature_buffer);       // Passing the address of the value
-      //app_assert_status(sc);
+                                                     voc_buffer);       // Passing the address of the value
 
       if(sc != SL_STATUS_OK)
       {
@@ -452,17 +575,19 @@ void report_data_ble(float temp_c)
       }
 
       sc = sl_bt_gatt_server_send_indication(ble_data.openedConnection,                  // characteristic
-                                         gattdb_temperature_measurement,            // Attribute from gatt_db.h
+                                             gattdb_VOC_index,            // Attribute from gatt_db.h
                                                 5,                                  // value_len
-                                                htm_temperature_buffer);            // value to be sent
+                                                voc_buffer);            // value to be sent
 
-      //app_assert_status(sc);
+      ble_data.inflight_indication = true;
+
       if(sc != SL_STATUS_OK)
       {
-         LOG_ERROR("sl_bt_gatt_server_send_indication failed\n");
+          ble_data.inflight_indication = false;
+          LOG_ERROR("sl_bt_gatt_server_send_indication failed = %d\n",sc);
       }
 
-      displayPrintf(DISPLAY_ROW_TEMPVALUE, "Temp = %d", temp);
+      displayPrintf(DISPLAY_ROW_TEMPVALUE, "VOC = %d", voc);
    }
    else
    {
