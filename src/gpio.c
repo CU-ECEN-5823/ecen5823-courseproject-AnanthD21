@@ -27,10 +27,10 @@
 // and GPIO documentation at https://siliconlabs.github.io/Gecko_SDK_Doc/efm32g/html/group__GPIO.html
 // to determine the correct values for these.
 
-#define LED0_port  gpioPortF //since LED0 is at portF, wkt port F is numbered 5
-#define LED0_pin   4         //since LED0 is at PF4
-#define LED1_port  gpioPortF //since LED1 is at portF, wkt port F is numbered 5
-#define LED1_pin   5         //since LED1 is at PF5
+#define LED0_port  gpioPortD //Led0 is red
+#define LED0_pin   10         //
+#define LED1_port  gpioPortD //Led1 is green
+#define LED1_pin   11         //
 
 #define SENSOR_EN_port gpioPortD // Sensor Enable port set to PortD
 #define SENSOR_EN_pin 15         // Sensor Enable pin set to 15
@@ -55,9 +55,9 @@ void gpioInit()
   //GPIO_DriveStrengthSet(LED0_port, gpioDriveStrengthWeakAlternateWeak);
   GPIO_PinModeSet(LED0_port, LED0_pin, gpioModePushPull, false);
 
-  //GPIO_DriveStrengthSet(LED1_port, gpioDriveStrengthStrongAlternateStrong);
+  GPIO_DriveStrengthSet(LED1_port, gpioDriveStrengthStrongAlternateStrong);
   //GPIO_DriveStrengthSet(LED1_port, gpioDriveStrengthWeakAlternateWeak);
-  //GPIO_PinModeSet(LED1_port, LED1_pin, gpioModePushPull, false);
+  GPIO_PinModeSet(LED1_port, LED1_pin, gpioModePushPull, false);
 
   GPIO_DriveStrengthSet(SENSOR_EN_port, gpioDriveStrengthStrongAlternateStrong);
   //GPIO_DriveStrengthSet(LED0_port, gpioDriveStrengthWeakAlternateWeak);

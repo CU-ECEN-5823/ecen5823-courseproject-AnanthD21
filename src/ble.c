@@ -25,7 +25,7 @@
 
 /*header files*/
 #include "ble.h"
-
+#include "gpio.h"
 #define INCLUDE_LOG_DEBUG 1
 #include "src/log.h"
 
@@ -111,7 +111,7 @@ void handle_ble_event(sl_bt_msg_t *evt)
                       ble_data.myAddress.addr[2],
                       ble_data.myAddress.addr[1],
                       ble_data.myAddress.addr[0]);
-        displayPrintf(DISPLAY_ROW_ASSIGNMENT, "A7");
+        displayPrintf(DISPLAY_ROW_ASSIGNMENT, "Final Project");
 
         app_assert_status(sc);
 
@@ -191,7 +191,7 @@ void handle_ble_event(sl_bt_msg_t *evt)
         displayInit();
         displayPrintf(DISPLAY_ROW_NAME, "Client");
 
-        displayPrintf(DISPLAY_ROW_ASSIGNMENT, "A7");
+        displayPrintf(DISPLAY_ROW_ASSIGNMENT, "Final Project");
         displayPrintf(DISPLAY_ROW_CONNECTION, "Discovering");
         displayPrintf(DISPLAY_ROW_BTADDR, "%02X:%02X:%02X:%02X:%02X:%02X",
                                     ble_data.myAddress.addr[5],
@@ -449,6 +449,17 @@ void handle_ble_event(sl_bt_msg_t *evt)
              LOG_INFO("VOC = %ld", voc_temp);
              displayPrintf(DISPLAY_ROW_CONNECTION, "Handling Indications");
              displayPrintf(DISPLAY_ROW_TEMPVALUE, "VOC = %d", voc_temp);
+
+             if(voc_temp > 29000)
+             {
+                 gpioLed1SetOff();
+                 gpioLed0SetOn();
+             }
+             else
+             {
+                 gpioLed1SetOn();
+                 gpioLed0SetOff();
+             }
           }
 
           if((evt->data.evt_gatt_characteristic_value.att_opcode == sl_bt_gatt_handle_value_indication) &&
